@@ -1,15 +1,13 @@
 local AudioStream = require('./AudioStream')
-local constants = require('./constants')
+local constants = require('../constants')
 
 local PCM_SIZE = constants.PCM_SIZE
-local PCM_LEN = constants.PCM_LEN
 
 local popen = io.popen
 local format, unpack, rep = string.format, string.unpack, string.rep
 
-local function shorts(str, len)
-    len = len or #str / 2
-    return {unpack(rep('<H', len), str)}
+local function shorts(str)
+    return {unpack(rep('<H', #str / 2), str)}
 end
 
 local FFmpegStream = class('FFmpegStream', AudioStream)
@@ -26,7 +24,7 @@ function FFmpegStream:play(duration)
 
 	local function source()
 		local success, bytes = pcall(pipe.read, pipe, PCM_SIZE)
-		return success and bytes and shorts(bytes, PCM_LEN)
+		return success and bytes and shorts(bytes)
 	end
 
 	self:_play(source, duration)

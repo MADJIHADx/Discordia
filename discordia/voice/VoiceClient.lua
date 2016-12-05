@@ -1,8 +1,9 @@
 local Buffer = require('../utils/Buffer')
 local ClientBase = require('../utils/ClientBase')
-local PCMStream = require('./PCMStream')
-local FFmpegStream = require('./FFmpegStream')
-local WaveformStream = require('./WaveformStream')
+local PCMStream = require('./streams/PCMStream')
+local ByteStream = require('./streams/ByteStream')
+local FFmpegStream = require('./streams/FFmpegStream')
+local WaveformStream = require('./streams/WaveformStream')
 local VoiceSocket = require('./VoiceSocket')
 local constants = require('./constants')
 local waveforms = require('./waveforms')
@@ -136,18 +137,12 @@ function VoiceClient:createFFmpegStream(filename)
 
 end
 
-function VoiceClient:createRawGenerator(bytes, offset, len) -- luacheck: ignore self
-	local buffer = Buffer(bytes)
-	offset = offset or 0
-	local limit = #buffer - offset
-	len = len and clamp(len, 0, limit) or limit
-	return function()
-		if offset >= len then return end
-		local left = buffer:readInt16LE(offset)
-		local right = buffer:readInt16LE(offset + 2)
-		offset = offset + 4
-		return left, right
-	end
+function VoiceClient:createByteStream(bytes)
+	return ByteStream(bytes, self)
+end
+
+function VoiceClient:createPCMStream(pcm)
+	return PCMStream(pcm, self)
 end
 
 function VoiceClient:createMonoToneGenerator(name, freq, amplitude) -- luacheck: ignore self
@@ -174,10 +169,6 @@ end
 
 function VoiceClient:createWaveformStream(generator)
 	return WaveformStream(generator, self)
-end
-
-function VoiceClient:createPCMStream(pcm)
-	return PCMStream(pcm, self)
 end
 
 return VoiceClient

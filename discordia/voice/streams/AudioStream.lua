@@ -1,5 +1,5 @@
-local Stopwatch = require('../utils/Stopwatch')
-local constants = require('./constants')
+local Stopwatch = require('../../utils/Stopwatch')
+local constants = require('../constants')
 local timer = require('timer')
 
 local max = math.max

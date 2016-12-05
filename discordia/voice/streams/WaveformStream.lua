@@ -1,5 +1,5 @@
 local AudioStream = require('./AudioStream')
-local constants = require('./constants')
+local constants = require('../constants')
 
 local PCM_LEN = constants.PCM_LEN
 
