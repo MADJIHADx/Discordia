@@ -1,7 +1,7 @@
 require('./extensions')
 _G.class = require('./class')
 
-local VoiceClient = require('./client/VoiceClient')
+local VoiceClient = require('./voice/VoiceClient')
 
 local function loadOpus(filename)
 	return VoiceClient._loadOpus(filename)
