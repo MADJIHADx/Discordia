@@ -16,6 +16,7 @@ function WaveformStream:play(duration)
 		local pcm = {}
 		for i = 0, PCM_SIZE / 2 - 1, 2 do
 			local left, right = generator()
+			if not left and not right then return end
 			pcm[i] = left or 0
 			pcm[i + 1] = right or 0
 		end

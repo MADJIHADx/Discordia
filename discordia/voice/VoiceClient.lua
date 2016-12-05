@@ -135,10 +135,13 @@ function VoiceClient:createFFmpegStream(filename)
 
 end
 
-function VoiceClient:createRawGenerator(bytes) -- luacheck: ignore self
+function VoiceClient:createRawGenerator(bytes, offset, len) -- luacheck: ignore self
 	local buffer = Buffer(bytes)
-	local offset = 0
+	offset = offset or 0
+	local limit = #buffer - offset
+	len = len and clamp(len, 0, limit) or limit
 	return function()
+		if offset >= len then return end
 		local left = buffer:readInt16LE(offset)
 		local right = buffer:readInt16LE(offset + 2)
 		offset = offset + 4
