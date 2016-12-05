@@ -1,5 +1,6 @@
 local Buffer = require('../utils/Buffer')
 local ClientBase = require('../utils/ClientBase')
+local PCMStream = require('./PCMStream')
 local FFmpegStream = require('./FFmpegStream')
 local WaveformStream = require('./WaveformStream')
 local VoiceSocket = require('./VoiceSocket')
@@ -173,6 +174,10 @@ end
 
 function VoiceClient:createWaveformStream(generator)
 	return WaveformStream(generator, self)
+end
+
+function VoiceClient:createPCMStream(pcm)
+	return PCMStream(pcm, self)
 end
 
 return VoiceClient

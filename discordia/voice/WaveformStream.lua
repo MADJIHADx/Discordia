@@ -1,7 +1,7 @@
 local AudioStream = require('./AudioStream')
 local constants = require('./constants')
 
-local PCM_SIZE = constants.PCM_SIZE
+local PCM_LEN = constants.PCM_LEN
 
 local WaveformStream = class('WaveformStream', AudioStream)
 
@@ -14,7 +14,7 @@ function WaveformStream:play(duration)
 	local generator = self._generator
 	local function source()
 		local pcm = {}
-		for i = 0, PCM_SIZE / 2 - 1, 2 do
+		for i = 0, PCM_LEN - 1, 2 do
 			local left, right = generator()
 			if not left and not right then return end
 			pcm[i] = left or 0
