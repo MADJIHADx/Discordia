@@ -1,11 +1,9 @@
-local Buffer = require('../utils/Buffer')
 local Stopwatch = require('../utils/Stopwatch')
 local constants = require('./constants')
 local timer = require('timer')
 
 local max = math.max
 local sleep = timer.sleep
-
 local running, resume, yield = coroutine.running, coroutine.resume, coroutine.yield
 
 local SILENCE = constants.SILENCE
@@ -20,36 +18,15 @@ function AudioStream:__init(client)
 	self._client = client
 end
 
-local function send(client, data)
-
-	local header = client._header
-	local nonce = client._nonce
-
-	header:writeUInt16BE(2, client._seq)
-	header:writeUInt32BE(4, client._timestamp)
-	header:writeUInt32BE(8, client._ssrc)
-
-	header:copy(nonce)
-
-	client._seq = client._seq < 0xFFFF and client._seq + 1 or 0
-	client._timestamp = client._timestamp < 0xFFFFFFFF and client._timestamp + FRAME_SIZE or 0
-
-	local encrypted = client._sodium.encrypt(data, tostring(nonce), client._key)
-
-	local len = #encrypted
-	local packet = Buffer(12 + len)
-	header:copy(packet)
-	packet:writeString(12, encrypted, len)
-
-	client._udp:send(tostring(packet), client._ip, client._port)
-
-end
-
 function AudioStream:_play(source, duration)
 
-	duration = duration or MAX_DURATION
-
 	local client = self._client
+
+	if not client._voice_socket._connected then
+		return client:warning('Cannot play stream. Voice connection not found.')
+	end
+
+	duration = duration or MAX_DURATION
 
 	client._voice_socket:setSpeaking(true)
 
@@ -65,19 +42,19 @@ function AudioStream:_play(source, duration)
 		local pcm = source()
 		if not pcm or self._stopped then break end
 		local data = encoder:encode(pcm, FRAME_SIZE, PCM_SIZE)
-		send(client, data)
+		client:_send(data)
 		local delay = FRAME_DURATION + (elapsed - clock.milliseconds)
 		elapsed = elapsed + FRAME_DURATION
 		sleep(max(0, delay))
 		while self._paused do
 			self._paused = running()
-			send(client, SILENCE)
+			client:_send(SILENCE)
 			clock:pause()
 			yield()
 			clock:resume()
 		end
 	end
-	send(client, SILENCE)
+	client:_send(SILENCE)
 
 	self._stopped = true
 	client._voice_socket:setSpeaking(false)
