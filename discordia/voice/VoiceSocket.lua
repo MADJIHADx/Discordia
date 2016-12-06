@@ -13,8 +13,8 @@ local setInterval, clearInterval = timer.setInterval, timer.clearInterval
 
 local VoiceSocket = class('VoiceSocket')
 
-function VoiceSocket:__init(client)
-	self._client = client
+function VoiceSocket:__init(connection)
+	self._connection = connection
 end
 
 function VoiceSocket:connect(endpoint)
@@ -37,6 +37,8 @@ end
 
 function VoiceSocket:handlePayloads()
 
+	local connection = self._connection
+
 	for data in self._read do
 
 		local payload = decode(data.payload)
@@ -47,14 +49,13 @@ function VoiceSocket:handlePayloads()
 			self:startHeartbeat(d.heartbeat_interval)
 			self:handshake(d.ip, d.port, d.ssrc)
 		elseif op == 4 then
-			local client = self._client
-			client._key = ffi.new('const unsigned char[32]', payload.d.secret_key)
-			client:emit('connect')
+			connection._key = ffi.new('const unsigned char[32]', payload.d.secret_key)
+			connection._client:emit('connect', connection)
 		end
 
 	end
 
-	p('voice disconnect') -- debug
+	return connection._client:emit('disconnect', connection)
 
 end
 
@@ -73,7 +74,7 @@ function VoiceSocket:handshake(ip, port, ssrc)
 				port = a + b * 0x100,
 				mode = 'xsalsa20_poly1305',
 			})
-			self._client:_prepare(udp, ip, port, ssrc)
+			self._connection:_prepare(udp, ip, port, ssrc)
 		end
 	end)
 

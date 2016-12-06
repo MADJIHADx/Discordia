@@ -1,5 +1,5 @@
-local Stopwatch = require('../../utils/Stopwatch')
-local constants = require('../constants')
+local Stopwatch = require('../utils/Stopwatch')
+local constants = require('./constants')
 local timer = require('timer')
 
 local max = math.max
@@ -14,50 +14,55 @@ local FRAME_DURATION = constants.FRAME_DURATION
 
 local AudioStream = class('AudioStream')
 
-function AudioStream:__init(client)
-	self._client = client
+function AudioStream:__init(source, connection)
+	self._source = source
+	self._connection = connection
 end
 
-function AudioStream:_play(source, duration)
+function AudioStream:play(duration)
 
-	local client = self._client
+	local connection = self._connection
+	local client = connection._client
 
-	if not client._voice_socket._connected then
+	if not connection._socket._connected then
 		return client:warning('Cannot play stream. Voice connection not found.')
 	end
 
 	duration = duration or MAX_DURATION
 
-	client._voice_socket:setSpeaking(true)
+	self._stopped = false
+	connection._stream = self
+	connection._socket:setSpeaking(true)
 
 	local elapsed = 0
 	local clock = Stopwatch()
-	local encoder = client._encoder
+	local encoder = connection._encoder
+	local source = self._source
 
 	self._elapsed = elapsed
 	self._clock = clock
-	self._stopped = false
 
 	while elapsed < duration do
 		local pcm = source()
 		if not pcm or self._stopped then break end
 		local data = encoder:encode(pcm, FRAME_SIZE, PCM_SIZE)
-		client:_send(data)
+		connection:_send(data)
 		local delay = FRAME_DURATION + (elapsed - clock.milliseconds)
 		elapsed = elapsed + FRAME_DURATION
 		sleep(max(0, delay))
 		while self._paused do
 			self._paused = running()
-			client:_send(SILENCE)
+			connection:_send(SILENCE)
 			clock:pause()
 			yield()
 			clock:resume()
 		end
 	end
-	client:_send(SILENCE)
+	connection:_send(SILENCE)
 
 	self._stopped = true
-	client._voice_socket:setSpeaking(false)
+	connection._stream = nil
+	connection._socket:setSpeaking(false)
 
 end
 

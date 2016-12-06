@@ -1,23 +1,13 @@
-local Buffer = require('../utils/Buffer')
 local ClientBase = require('../utils/ClientBase')
-local PCMStream = require('./streams/PCMStream')
-local ByteStream = require('./streams/ByteStream')
-local FFmpegStream = require('./streams/FFmpegStream')
-local WaveformStream = require('./streams/WaveformStream')
-local VoiceSocket = require('./VoiceSocket')
+local VoiceConnection = require('./VoiceConnection')
 local constants = require('./constants')
 local waveforms = require('./waveforms')
 
 local CHANNELS = constants.CHANNELS
-local FRAME_SIZE = constants.FRAME_SIZE
 local SAMPLE_RATE = constants.SAMPLE_RATE
 local SAMPLE_PERIOD = constants.SAMPLE_PERIOD
 local MAX_INT16 = constants.MAX_INT16
 local TAU = constants.TAU
-
-local clamp = math.clamp
-local format = string.format
-local open = io.open
 
 local defaultOptions = {
 	dateTime = '%c',
@@ -44,105 +34,47 @@ end
 
 function VoiceClient:__init(customOptions)
 	ClientBase.__init(self, customOptions, defaultOptions)
-	if type(opus) == 'function' or type(sodium) == 'function' then
+	if not VoiceClient._opus or not VoiceClient._sodium then
 		return self:error('Cannot initialize a VoiceClient before loading voice libraries.')
 	end
-	self._encoder = opus.Encoder(SAMPLE_RATE, CHANNELS)
-	self._encoder:set_bitrate(self._options.bitrate)
-	self._voice_socket = VoiceSocket(self)
-	self._seq = 0
-	self._timestamp = 0
-	local header = Buffer(12)
-	local nonce = Buffer(24)
-	header[0] = 0x80
-	header[1] = 0x78
-	self._header = header
-	self._nonce = nonce
-end
-
-function VoiceClient:_prepare(udp, ip, port, ssrc)
-	self._udp, self._ip, self._port, self._ssrc = udp, ip, port, ssrc
+	self._connections = {}
 end
 
 function VoiceClient:joinChannel(channel, selfMute, selfDeaf)
-	local current = self._channel
-	local id = channel._parent._id
-	if current and current._parent._id ~= id then
-		self:disconnect() -- guild switch
-	end
-	self._channel = channel
-	local client = channel.client
-	client._voice_sockets[id] = self._voice_socket
-	return client._socket:joinVoiceChannel(id, channel._id, selfMute, selfDeaf)
-end
 
-function VoiceClient:disconnect()
-	local channel = self._channel
-	if not channel then return end
-	self:stop()
-	self._channel = nil
-	local client = channel.client
-	local id = channel._parent._id
-	client._voice_sockets[id] = nil
-	client._socket:joinVoiceChannel(id)
-	self._voice_socket:disconnect()
-end
+	local guild = channel._parent
+	local id = guild._id
+	local connection = self._connections[id]
 
-function VoiceClient:getBitrate()
-	return self._encoder:get_bitrate()
-end
-
-function VoiceClient:setBitrate(bitrate)
-	return self._encoder:set_bitrate(clamp(bitrate, 8000, 128000))
-end
-
-function VoiceClient:_send(data)
-
-	local header = self._header
-	local nonce = self._nonce
-
-	header:writeUInt16BE(2, self._seq)
-	header:writeUInt32BE(4, self._timestamp)
-	header:writeUInt32BE(8, self._ssrc)
-
-	header:copy(nonce)
-
-	self._seq = self._seq < 0xFFFF and self._seq + 1 or 0
-	self._timestamp = self._timestamp < 0xFFFFFFFF and self._timestamp + FRAME_SIZE or 0
-
-	local encrypted = self._sodium.encrypt(data, tostring(nonce), self._key)
-
-	local len = #encrypted
-	local packet = Buffer(12 + len)
-	header:copy(packet)
-	packet:writeString(12, encrypted, len)
-
-	self._udp:send(tostring(packet), self._ip, self._port)
-
-end
-
-function VoiceClient:createFFmpegStream(filename)
-
-	if not self._ffmpeg then
-		return self:warning(format('Cannot open %q. FFmpeg not loaded.'))
+	if connection then
+		if connection._channel == channel then return end
+	else
+		local encoder = opus.Encoder(SAMPLE_RATE, CHANNELS)
+		encoder:set_bitrate(self._options.bitrate)
+		connection = VoiceConnection(encoder, channel, self)
+		guild._connection = connection
+		self._connections[id] = connection
 	end
 
-	local file = open(filename)
-	if not file then
-		return self:warning(format('Cannot open %q. File not found.', filename))
-	end
-	file:close()
-
-	return FFmpegStream(filename, self)
+	return guild._parent._socket:joinVoiceChannel(id, channel._id, selfMute, selfDeaf)
 
 end
 
-function VoiceClient:createByteStream(bytes)
-	return ByteStream(bytes, self)
-end
+function VoiceClient:leaveChannel(channel)
 
-function VoiceClient:createPCMStream(pcm)
-	return PCMStream(pcm, self)
+	local guild = channel._parent
+	local id = guild._id
+	local connection = self._connections[id]
+
+	if not connection then return end
+
+	connection:stop()
+	guild._connection = nil
+	self._connections[id] = nil
+	connection._socket:disconnect()
+
+	return guild._parent._socket:joinVoiceChannel(id)
+
 end
 
 function VoiceClient:createMonoToneGenerator(name, freq, amplitude) -- luacheck: ignore self
@@ -165,10 +97,6 @@ function VoiceClient:createPolyToneGenerator(args) -- luacheck: ignore self
 		end
 		return s, s
 	end
-end
-
-function VoiceClient:createWaveformStream(generator)
-	return WaveformStream(generator, self)
 end
 
 return VoiceClient

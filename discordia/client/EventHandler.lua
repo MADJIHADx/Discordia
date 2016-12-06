@@ -412,7 +412,7 @@ function EventHandler.VOICE_SERVER_UPDATE(data, client)
 	if not guild then return warning(client, 'Guild', guild_id, 'VOICE_STATE_UPDATE') end
 	local state = guild._voice_states[user_id]
 
-	local socket = client._voice_sockets[guild_id]
+	local socket = guild._connection._socket
 
 	wrap(function()
 		socket:connect(data.endpoint)
