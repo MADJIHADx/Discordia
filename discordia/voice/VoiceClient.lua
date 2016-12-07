@@ -16,31 +16,27 @@ local defaultOptions = {
 
 local VoiceClient = class('VoiceClient', ClientBase)
 
-local opus = require('./opus')
-function VoiceClient._loadOpus(filename)
-	opus = opus(filename)
-	VoiceClient._opus = opus
-end
-
-local sodium = require('./sodium')
-function VoiceClient._loadSodium(filename)
-	sodium = sodium(filename)
-	VoiceClient._sodium = sodium
-end
-
-function VoiceClient._loadFFmpeg(filename)
-	VoiceClient._ffmpeg = filename
-end
-
 function VoiceClient:__init(customOptions)
 	ClientBase.__init(self, customOptions, defaultOptions)
-	if not VoiceClient._opus or not VoiceClient._sodium then
-		return self:error('Cannot initialize a VoiceClient before loading voice libraries.')
-	end
 	self._connections = {}
 end
 
+local opus
+function VoiceClient:loadOpus(filename)
+	opus = opus or require('./opus')(filename)
+	self._opus = opus
+end
+
+local sodium
+function VoiceClient:loadSodium(filename)
+	sodium = sodium or require('./sodium')(filename)
+	self._sodium = sodium
+end
+
 function VoiceClient:joinChannel(channel, selfMute, selfDeaf)
+
+	if not opus then return self:warning('Cannot join voice channel: libopus not loaded.') end
+	if not sodium then return self:warning('Cannot join voice channel: libsodium not loaded.') end
 
 	local guild = channel._parent
 	local id = guild._id
@@ -51,7 +47,7 @@ function VoiceClient:joinChannel(channel, selfMute, selfDeaf)
 	else
 		local encoder = opus.Encoder(SAMPLE_RATE, CHANNELS)
 		encoder:set_bitrate(self._options.bitrate)
-		connection = VoiceConnection(encoder, channel, self)
+		connection = VoiceConnection(encoder, sodium.encrypt, channel, self)
 		guild._connection = connection
 		self._connections[id] = connection
 	end

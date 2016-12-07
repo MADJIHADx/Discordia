@@ -1,20 +1,6 @@
 require('./extensions')
 _G.class = require('./class')
 
-local VoiceClient = require('./voice/VoiceClient')
-
-local function loadOpus(filename)
-	return VoiceClient._loadOpus(filename)
-end
-
-local function loadSodium(filename)
-	return VoiceClient._loadSodium(filename)
-end
-
-local function loadFFmpeg(filename)
-	return VoiceClient._loadFFmpeg(filename)
-end
-
 return {
 	Client = require('./client/Client'),
 	Buffer = require('./utils/Buffer'),
@@ -26,8 +12,5 @@ return {
 	OrderedCache = require('./utils/OrderedCache'),
 	Permissions = require('./utils/Permissions'),
 	Stopwatch = require('./utils/Stopwatch'),
-	VoiceClient = VoiceClient,
-	loadOpus = loadOpus,
-	loadSodium = loadSodium,
-	loadFFmpeg = loadFFmpeg,
+	VoiceClient = require('./voice/VoiceClient'),
 }

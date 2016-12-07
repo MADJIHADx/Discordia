@@ -2,14 +2,16 @@ local VoiceSocket = require('./VoiceSocket')
 local AudioStream = require('./AudioStream')
 local Buffer = require('../utils/Buffer')
 local constants = require('./constants')
+local fs = require('fs')
 
 local PCM_LEN = constants.PCM_LEN
 local PCM_SIZE = constants.PCM_SIZE
 local FRAME_SIZE = constants.FRAME_SIZE
 
+local exists = fs.existsSync
 local clamp = math.clamp
 local format, unpack, rep = string.format, string.unpack, string.rep
-local open, popen = io.open, io.popen
+local popen = io.popen
 
 local function shorts(str)
     return {unpack(rep('<H', #str / 2), str)}
@@ -17,11 +19,12 @@ end
 
 local VoiceConnection = class('VoiceConnection')
 
-function VoiceConnection:__init(encoder, channel, client)
+function VoiceConnection:__init(encoder, encrypt, channel, client)
 	self._client = client
 	self._channel = channel
 	self._socket = VoiceSocket(self)
 	self._encoder = encoder
+	self._encrypt = encrypt
 	self._seq = 0
 	self._timestamp = 0
 	local header = Buffer(12)
@@ -50,7 +53,7 @@ function VoiceConnection:_send(data)
 	self._seq = self._seq < 0xFFFF and self._seq + 1 or 0
 	self._timestamp = self._timestamp < 0xFFFFFFFF and self._timestamp + FRAME_SIZE or 0
 
-	local encrypted = self._client._sodium.encrypt(data, tostring(nonce), self._key)
+	local encrypted = self._encrypt(data, tostring(nonce), self._key)
 
 	local len = #encrypted
 	local packet = Buffer(12 + len)
@@ -76,20 +79,11 @@ end
 
 function VoiceConnection:playFile(filename, duration)
 
-	local client = self._client
-	local ffmpeg = client._ffmpeg
-
-	if not ffmpeg then
-		return client:warning(format('Cannot open %q. FFmpeg not loaded.'))
+	if not exists(filename) then
+		return self._client:warning(format('Cannot open %q. File not found.', filename))
 	end
 
-	local file = open(filename)
-	if not file then
-		return client:warning(format('Cannot open %q. File not found.', filename))
-	end
-	file:close()
-
-	local pipe = popen(format('%s -y -i %q -ar 48000 -ac 2 -f s16le pipe:1 -loglevel warning', ffmpeg, filename))
+	local pipe = popen(format('ffmpeg -y -i %q -ar 48000 -ac 2 -f s16le pipe:1 -loglevel warning', filename))
 
 	local function source()
 		local success, bytes = pcall(pipe.read, pipe, PCM_SIZE)
