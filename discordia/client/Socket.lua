@@ -63,7 +63,7 @@ local function handleUnexpectedDisconnect(self, client, token)
 	sleep(self._backoff)
 	incrementReconnectTime(self)
 	if not pcall(self.reconnect, self, token) then
-		return handleUnexpectedDisconnect(self, token)
+		return handleUnexpectedDisconnect(self, client, token)
 	end
 end
 
