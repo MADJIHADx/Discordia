@@ -100,13 +100,13 @@ function VoiceConnection:playBytes(bytes, duration)
 	local offset = 0
 	local len = #buffer
 	local function source()
-		if offset >= len then return end
+		if len - offset < 4 then return end
 		local pcm = {}
 		for i = 0, PCM_LEN - 1, 2 do
 			pcm[i] = buffer:readInt16LE(offset)
 			pcm[i + 1] = buffer:readInt16LE(offset + 2)
 			offset = offset + 4
-			if offset >= len then break end
+			if len - offset < 4 then break end
 		end
 		return pcm
 	end
