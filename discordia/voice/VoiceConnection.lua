@@ -142,17 +142,17 @@ function VoiceConnection:playWaveform(generator, duration)
 	return play(self, source, duration)
 end
 
-function VoiceConnection:pause()
+function VoiceConnection:pauseStream()
 	if not self._stream then return end
 	return self._stream:pause()
 end
 
-function VoiceConnection:resume()
+function VoiceConnection:resumeStream()
 	if not self._stream then return end
 	return self._stream:resume()
 end
 
-function VoiceConnection:stop()
+function VoiceConnection:stopStream()
 	if not self._stream then return end
 	return self._stream:stop()
 end

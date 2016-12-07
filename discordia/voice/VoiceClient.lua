@@ -64,13 +64,37 @@ function VoiceClient:leaveChannel(channel)
 
 	if not connection then return end
 
-	connection:stop()
+	connection:stopStream()
 	guild._connection = nil
 	self._connections[id] = nil
 	connection._socket:disconnect()
 
 	return guild._parent._socket:joinVoiceChannel(id)
 
+end
+
+function VoiceClient:pauseStreams()
+	for _, connection in pairs(self._connections) do
+		if connection._stream then
+			connection._stream:pause()
+		end
+	end
+end
+
+function VoiceClient:resumeStreams()
+	for _, connection in pairs(self._connections) do
+		if connection._stream then
+			connection._stream:resume()
+		end
+	end
+end
+
+function VoiceClient:stopStreams()
+	for _, connection in pairs(self._connections) do
+		if connection._stream then
+			connection._stream:stop()
+		end
+	end
 end
 
 function VoiceClient:createMonoToneGenerator(name, freq, amplitude) -- luacheck: ignore self

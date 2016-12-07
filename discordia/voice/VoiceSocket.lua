@@ -38,6 +38,7 @@ end
 function VoiceSocket:handlePayloads()
 
 	local connection = self._connection
+	local client = connection._client
 
 	for data in self._read do
 
@@ -50,12 +51,15 @@ function VoiceSocket:handlePayloads()
 			self:handshake(d.ip, d.port, d.ssrc)
 		elseif op == 4 then
 			connection._key = ffi.new('const unsigned char[32]', payload.d.secret_key)
-			connection._client:emit('connect', connection)
+			client:emit('connect', connection)
+			client:emit('channelJoin', connection._channel)
 		end
 
 	end
 
-	return connection._client:emit('disconnect', connection)
+	connection:stopStream()
+	client:emit('channelLeave', connection._channel)
+	client:emit('disconnect', connection)
 
 end
 

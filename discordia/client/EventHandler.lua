@@ -388,6 +388,11 @@ function EventHandler.VOICE_STATE_UPDATE(data, client)
 				guild._voice_states[id] = data
 				client:emit('voiceChannelLeave', member, old)
 				client:emit('voiceChannelJoin', member, new)
+				if id == client._user._id then
+					local voice = guild._connection._client
+					voice:emit('channelLeave', old)
+					voice:emit('channelJoin', new)
+				end
 			end
 		else
 			guild._voice_states[id] = nil
