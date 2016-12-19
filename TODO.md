@@ -3,11 +3,11 @@ Probable additions
 - Sanitized channel/role position setting
 - Option to disable event handler
 - Parse message attachments and embeds
-- Message reactions
 - File uploading
 - Sharding
 
 Possible additions
+- Commands module
 - Logging support
 - Group DMs
 - Webhooks
@@ -15,7 +15,7 @@ Possible additions
 - Game class
 - Handle unhandled gateway events
 - Helper functions, like getMembersWithRole, ...
-- Guild integrations, emojis, and features
+- Guild integrations and features
 - Voice support
 - Add client layer between the HTTP requests and OO methods
 - Class statics

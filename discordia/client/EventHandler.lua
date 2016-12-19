@@ -2,6 +2,7 @@ local timer = require('timer')
 local Stopwatch = require('../utils/Stopwatch')
 
 local format = string.format
+local wrap = coroutine.wrap
 local insert, concat, keys = table.insert, table.concat, table.keys
 
 local function warning(client, object, id, event)
@@ -200,6 +201,13 @@ function EventHandler.GUILD_BAN_REMOVE(data, client)
 	return client:emit('userUnban', user, guild)
 end
 
+function EventHandler.GUILD_EMOJIS_UPDATE(data, client)
+	local guild = client._guilds:get(data.guild_id)
+	if not guild then return warning(client, 'Guild', data.guild_id, 'GUILD_EMOJIS_UPDATE') end
+	guild._emojis:_update(data.emojis)
+	return client:emit('emojisUpdate', guild)
+end
+
 function EventHandler.GUILD_MEMBER_ADD(data, client)
 	local guild = client._guilds:get(data.guild_id)
 	if not guild then return warning(client, 'Guild', data.guild_id, 'GUILD_MEMBER_ADD') end
@@ -315,6 +323,28 @@ function EventHandler.MESSAGE_DELETE_BULK(data, client)
 	end
 end
 
+function EventHandler.MESSAGE_REACTION_ADD(data, client)
+	local channel = client:getTextChannel(data.channel_id) -- shortcut required
+	if not channel then return warning(client, 'TextChannel', data.channel_id, 'MESSAGE_REACTION_ADD') end
+	local message = channel._messages:get(data.message_id)
+	if not message then return warning(client, 'Message', data.message_id, 'MESSAGE_REACTION_ADD') end
+	local user = client._users:get(data.user_id)
+	if not user then return warning(client, 'User', data.user_id, 'MESSAGE_REACTION_ADD') end
+	local reaction = message:_addReaction(data, user)
+	return client:emit('reactionAdd', reaction, user)
+end
+
+function EventHandler.MESSAGE_REACTION_REMOVE(data, client)
+	local channel = client:getTextChannel(data.channel_id) -- shortcut required
+	if not channel then return warning(client, 'TextChannel', data.channel_id, 'MESSAGE_REACTION_REMOVE') end
+	local message = channel._messages:get(data.message_id)
+	if not message then return warning(client, 'Message', data.message_id, 'MESSAGE_REACTION_REMOVE') end
+	local user = client._users:get(data.user_id)
+	if not user then return warning(client, 'User', data.user_id, 'MESSAGE_REACTION_REMOVE') end
+	local reaction = message:_removeReaction(data, user)
+	return client:emit('reactionRemove', reaction, user)
+end
+
 function EventHandler.PRESENCE_UPDATE(data, client)
 	if not data.guild_id then return end -- friend update
 	local guild = client._guilds:get(data.guild_id)
@@ -341,11 +371,11 @@ end
 function EventHandler.VOICE_STATE_UPDATE(data, client)
 	local guild = client._guilds:get(data.guild_id)
 	if not guild then return warning(client, 'Guild', data.guild_id, 'VOICE_STATE_UPDATE') end
-	local member = guild._members:get(data.user_id)
-	if not member then return warning(client, 'Member', data.user_id, 'VOICE_STATE_UPDATE') end
+	local id = data.user_id
+	local member = guild._members:get(id)
+	if not member then return warning(client, 'Member', id, 'VOICE_STATE_UPDATE') end
 	local mute = data.mute or data.self_mute
 	local deaf = data.deaf or data.self_deaf
-	local id = data.session_id
 	local state = guild._voice_states[id]
 	if state then
 		if data.channel_id then
@@ -358,6 +388,11 @@ function EventHandler.VOICE_STATE_UPDATE(data, client)
 				guild._voice_states[id] = data
 				client:emit('voiceChannelLeave', member, old)
 				client:emit('voiceChannelJoin', member, new)
+				if id == client._user._id then
+					local voice = guild._connection._client
+					voice:emit('channelLeave', old)
+					voice:emit('channelJoin', new)
+				end
 			end
 		else
 			guild._voice_states[id] = nil
@@ -371,6 +406,30 @@ function EventHandler.VOICE_STATE_UPDATE(data, client)
 		client:emit('voiceConnect', member, mute, deaf)
 		client:emit('voiceChannelJoin', member, new)
 	end
+end
+
+function EventHandler.VOICE_SERVER_UPDATE(data, client)
+
+	local guild_id = data.guild_id
+	local user_id = client._user._id
+
+	local guild = client._guilds:get(guild_id)
+	if not guild then return warning(client, 'Guild', guild_id, 'VOICE_STATE_UPDATE') end
+	local state = guild._voice_states[user_id]
+
+	local socket = guild._connection._socket
+
+	wrap(function()
+		socket:connect(data.endpoint)
+		socket:identify({
+			server_id = guild_id,
+			user_id = user_id,
+			session_id = state.session_id,
+			token = data.token,
+		})
+		return socket:handlePayloads()
+	end)()
+
 end
 
 return EventHandler

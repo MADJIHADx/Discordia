@@ -1,5 +1,20 @@
 # Changelog
 
+### 1.1.0
+
+- Implemented emoji features
+	- Added Emoji and Reaction classes
+	- Added message reaction methods
+	  - `addReaction`, `removeReaction`, `clearReactions`, `getReactionUsers`, `getReactions`
+	- Added handling of message reaction and emoji events
+	  - `reactionAdd`, `reactionRemove`, `emojisUpdate`
+	- Emoji are formally cached per guild
+	- Reactions are stored per message, but are not formally cached
+- Fixed issue where PermissionOverwrites for members were not named
+- Added more standard library extensions:
+  - `table.slice`, `string.startswith`, `string.endswith`, `string.levenshtein`
+
+
 ### 1.0.0
 
 - General
